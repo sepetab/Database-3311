@@ -1,0 +1,120 @@
+#!/usr/bin/python3
+
+import sqlite3
+import sys
+import re
+
+if len(sys.argv) != 3:
+    print("Usage: ./toprank Genres MinRating")
+    sys.exit(1)
+
+genres = set([x.lower() for x in sys.argv[1].split("&")])
+score = float(sys.argv[2])
+# print(genres, score)
+
+query = f"""
+    SELECT m.id,m.title, m.content_rating,m.lang,m.year,r.imdb_score,r.num_voted_users,g.genre
+    FROM movie m
+    LEFT JOIN rating r on r.movie_id = m.id
+    LEFT JOIN genre g on g.movie_id = m.id
+    where r.imdb_score >= {score}
+    order by r.imdb_score desc, r.num_voted_users desc, m.id
+"""
+
+
+prevDict = {
+    'id': None,
+    'title': "",
+    'year': "",
+    'content_rating': "",
+    'imdb_score': "",
+    'lang': "",
+    'num_votes': "",
+    'genres': set()
+}
+
+
+def setDict(t):
+    id, title, content_rating, lang, year, imdb_score, num_votes, genre = t
+    if genre:
+        prevDict['genres'].add(genre.lower())
+    if id:
+        prevDict['id'] = id
+    if title:
+        prevDict['title'] = title
+    if lang:
+        prevDict['lang'] = lang
+    if content_rating:
+        prevDict['content_rating'] = content_rating
+    if imdb_score:
+        prevDict['imdb_score'] = imdb_score
+    if year:
+        prevDict['year'] = year
+    if num_votes:
+        prevDict['num_votes'] = num_votes
+
+
+def resetDict():
+    global prevDict
+    prevDict = {
+        'id': None,
+        'title': "",
+        'year': "",
+        'content_rating': "",
+        'imdb_score': "",
+        'lang': "",
+        'num_votes': "",
+        'genres': set()
+    }
+
+
+count = 1
+
+
+def printer(information):
+    global count
+    # print(information['title'])
+    if genres.issubset(information['genres']) or genres == set(['']):
+
+        meta = [
+            information['year'], information['content_rating'], information['lang']]
+        meta = tuple([i for i in meta if i != ""])
+
+        voteInfo = ["{:.1f}".format(
+            information['imdb_score']), information['num_votes']]
+        voteInfo = tuple(i for i in voteInfo if i != "")
+
+        # PRINTING
+        if information['title']:
+            print(f"{count}. {information['title']} ", end='')
+
+            if meta:
+                print("(", end='')
+                print(*meta, sep=", ", end='')
+                print(") ", end='')
+
+            if voteInfo:
+                print("[", end='')
+                print(*voteInfo, sep=", ", end='')
+                print("]", end='')
+            print('')
+
+            count += 1
+
+
+con = sqlite3.connect('a2.db')
+
+cur = con.cursor()
+
+cur.execute(query)
+
+for t in cur.fetchall():
+    if prevDict['id'] != None and prevDict['id'] != t[0]:
+        printer(prevDict)
+        resetDict()
+    setDict(t)
+printer(prevDict)
+con.close()
+
+
+# # print(id, title, content_rating, imdb_score, genre, actor, director)

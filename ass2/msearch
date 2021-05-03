@@ -1,0 +1,135 @@
+#!/usr/bin/python3
+
+import sqlite3
+import sys
+import re
+
+if len(sys.argv) < 2:
+    print("Usage:", sys.argv[0], "SUBSTRING-1 SUBSTRING-2 SUBSTRING-3 ...")
+    sys.exit(1)
+
+substrings = [s for s in sys.argv if s != sys.argv[0]]
+
+# print(substrings)
+prevDict = {
+    'actors': set(),
+    'genres': set(),
+    'id': None,
+    'title': "",
+    'director': "",
+    'content_rating': "",
+    'imdb_score': "",
+    'year': ""
+}
+
+
+def concat(*args):
+    finalList = []
+    finalString = ""
+    for list in args:
+        finalList += list
+    for string in finalList:
+        finalString += string
+    return finalString
+
+
+def setDict(t):
+    id, title, content_rating, imdb_score, genre, actor, director, year = t
+    if actor:
+        prevDict['actors'].add(actor)
+    if genre:
+        prevDict['genres'].add(genre)
+    if id:
+        prevDict['id'] = id
+    if title:
+        prevDict['title'] = title
+    if director:
+        prevDict['director'] = director
+    if content_rating:
+        prevDict['content_rating'] = content_rating
+    if imdb_score:
+        prevDict['imdb_score'] = imdb_score
+    if year:
+        prevDict['year'] = year
+
+
+def resetDict():
+    global prevDict
+    prevDict = {
+        'actors': set(),
+        'genres': set(),
+        'id': None,
+        'title': "",
+        'director': "",
+        'content_rating': "",
+        'imdb_score': "",
+        'year': ""
+    }
+
+
+count = 1
+
+
+def printer(information):
+    # if(information['id'] == 2330):
+    #     print(information['title'])
+    global count
+    finalString = concat([information['title']], list(
+        information['actors']), [information['director']])
+
+    # flag to print info or not
+    flag = 1
+    for substring in substrings:
+        if not(re.search(substring, finalString, re.IGNORECASE)):
+            flag = 0
+
+    if flag:
+        genres = sorted(list(information['genres']))
+        meta = [
+            information['year'], information['content_rating'], "{:.1f}".format(information['imdb_score'])]
+        meta = tuple([i for i in meta if i != ""])
+
+        # PRINTING
+        if information['title']:
+            print(f"{count}. {information['title']} ", end='')
+
+        if meta:
+            print("(", end='')
+            print(*meta, sep=", ", end='')
+            print(") ", end='')
+
+        if genres:
+            print("[% s]" % (','.join(genres)), end='')
+        print('')
+
+        count += 1
+
+
+# SELECT m.id, m.title, m.year from movie m
+# JOIN rating r on r.movie_id = m.id where m.id = 3330
+query = """
+    SELECT m.id, m.title, m.content_rating, r.imdb_score, g.genre, a.name as actor, d.name as director, m.year
+    FROM movie m 
+    LEFT JOIN rating r on r.movie_id = m.id 
+    LEFT JOIN genre g on g.movie_id = m.id
+    LEFT JOIN acting ag on ag.movie_id = m.id
+    JOIN actor a on a.id = ag.actor_id
+    LEFT JOIN director d on d.id = m.director_id
+    order by m.year desc, r.imdb_score desc, m.title, m.id
+"""
+con = sqlite3.connect('a2.db')
+
+cur = con.cursor()
+
+cur.execute(query)
+
+for t in cur.fetchall():
+    if prevDict['id'] != None and prevDict['id'] != t[0]:
+        printer(prevDict)
+        resetDict()
+    setDict(t)
+printer(prevDict)
+con.close()
+
+
+# print(id, title, content_rating, imdb_score, genre, actor, director)

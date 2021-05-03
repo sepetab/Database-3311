@@ -1,0 +1,108 @@
+#!/usr/bin/python3
+
+import sqlite3
+import sys
+import re
+
+if len(sys.argv) != 3:
+    print("Usage: ./shortest Actor1 Actor2")
+    sys.exit(1)
+
+actor1 = sys.argv[1]
+actor2 = sys.argv[2]
+results = []
+count = 1
+
+dropper = "drop view if exists map"
+viewCreate = """
+    create view map(title, year, a1, a2) as
+    select DISTINCT m.title, m.year, a1.name, a2.name
+    FROM movie m
+    JOIN acting ag1 on ag1.movie_id = m.id
+    JOIN acting ag2 on ag2.movie_id = m.id
+    JOIN actor a1 on ag1.actor_id = a1.id
+    JOIN actor a2 on ag2.actor_id = a2.id
+    where a1.name != a2.name
+"""
+
+query1 = f"""
+    select m1.a1, m1.title, m1.year, m1.a2
+    from map m1
+    where m1.a1 = "{actor1}" COLLATE NOCASE and m1.a2 = "{actor2}"  COLLATE NOCASE
+"""
+query2 = f"""
+    select  m1.a1, m1.title, m1.year, m1.a2, m2.title, m2.year, m2.a2
+    from map m1, map m2
+    where m1.a1 = "{actor1}" COLLATE NOCASE and m1.a2 = m2.a1 and m2.a2 = "{actor2}" COLLATE NOCASE  
+"""
+query3 = f"""
+    select  m1.a1, m1.title, m1.year,  m1.a2, m2.title, m2.year, m2.a2, m3.title, m3.year, m3.a2
+    from map m1, map m2, map m3
+    where m1.a1 = "{actor1}" COLLATE NOCASE and m1.a2 = m2.a1 and m2.a2 = m3.a1 and m3.a2 = "{actor2}" COLLATE NOCASE
+"""
+query4 = f"""
+    select  m1.a1, m1.title, m1.year, m1.a2, m2.title, m2.year,  m2.a2, m3.title, m3.year, m3.a2, m4.title, m4.year, m4.a2
+    from map m1, map m2, map m3, map m4
+    where m1.a1 = "{actor1}" COLLATE NOCASE and m1.a2 = m2.a1 and m2.a2 = m3.a1 and m3.a2 = m4.a1 and m4.a2 = "{actor2}" COLLATE NOCASE
+"""
+query5 = f"""
+    select  m1.a1, m1.title, m1.year, m1.a2, m2.title, m2.year, m2.a2, m3.title, m3.year, m3.a2, m4.title, m4.year, m4.a2, m5.title, m5.year, m5.a2
+    from map m1, map m2, map m3, map m4, map m5
+    where m1.a1 = "{actor1}" COLLATE NOCASE and m1.a2 = m2.a1 and m2.a2 = m3.a1 and m3.a2 = m4.a1 and m4.a2 = m5.a1 and m5.a2 = "{actor2}" COLLATE NOCASE
+"""
+query6 = f"""
+    select  m1.a1, m1.title, m1.year, m1.a2, m2.title, m2.year, m2.a2, m3.title, m3.year, m3.a2, m4.title, m4.year, m4.a2, m5.title, m5.year, m5.a2, m6.title, m6.year, m6.a2
+    from map m1, map m2, map m3, map m4, map m5, map m6
+    where m1.a1 = "{actor1}" COLLATE NOCASE and m1.a2 = m2.a1 and m2.a2 = m3.a1 and m3.a2 = m4.a1 and m4.a2 = m5.a1 and m5.a2 = m6.a1 and m6.a2 = "{actor2}" COLLATE NOCASE
+"""
+
+
+def formatter(t):
+    global results
+    for entry in t:
+        formattedString = ""
+        for key, item in enumerate(entry):
+            if isinstance(item, int) or (item is None):
+                if item:
+                    formattedString += ("(" + str(item) + ")" + " with ")
+                else:
+                    formattedString += "with "
+            else:
+                formattedString += (str(item) + " ")
+            if key == 0:
+                formattedString += "was in "
+            if key % 3 == 0 and len(entry) != (key+1) and key != 0:
+                formattedString = formattedString.strip()
+                formattedString += f"; {item} was in "
+        results.append(formattedString.strip())
+
+
+def printer():
+    global results
+    global count
+    if results:
+        results.sort()
+        for result in results:
+            print(str(count) + ". " + result)
+            count += 1
+
+
+con = sqlite3.connect('a2.db')
+
+cur = con.cursor()
+
+cur.execute(dropper)
+cur.execute(viewCreate)
+
+iterInt = 1
+
+while iterInt < 7:
+    cur.execute(eval("query" + str(iterInt)))
+
+    t = cur.fetchall()
+    if t:
+        formatter(t)
+        break
+    iterInt += 1
+printer()
+con.close()
